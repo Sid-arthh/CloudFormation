@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Create an autoscaling group using t2.micro EC2 instances in us-east-1a availability zone in the default vpc. All EC2 instances should have Apache installed with the ability to check any EC2 created by the autoscaling groups Public IP address and be able to produce a test page.
+
+Resources:
+  
+  #Creating launch template that will install Apache upon any EC2 Instance startup
+  MyLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: LaunchTemplate
+      LaunchTemplateData:
+        ImageId: ami-0df2ca8a354185e1e
+        InstanceType: t2.micro
+        KeyName: AL4
+        SecurityGroups: 
+        - !Ref MySecurityGroup
+        UserData: 
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            yum update -y 
+            yum install -y httpd 
+            systemctl start httpd 
+            systemctl enable httpd
+
+  #This will create a security group and allow us to receive web traffic and ssh into the instances
+  MySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow inbound traffic from HTTP and SSH
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          IpProtocol: tcp
+          ToPort: 80
+        - CidrIp: 0.0.0.0/0
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+  
+  #Creating autoscaling group with desired minimum and maximum size
+  MyASG:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn: MyLaunchTemplate # wait for MyLaunchTemplate to be created before creating MyASG
+    Properties:
+      LaunchTemplate:
+        LaunchTemplateId: !Ref MyLaunchTemplate
+        Version: !GetAtt MyLaunchTemplate.LatestVersionNumber
+      MinSize: 2
+      MaxSize: 3
+      DesiredCapacity: 2
+      AvailabilityZones: !GetAZs ''
+     # - us-east-1a
+      MetricsCollection:
+      - Granularity: 1Minute
