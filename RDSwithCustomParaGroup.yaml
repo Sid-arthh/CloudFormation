@@ -1,0 +1,87 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: Creates an RDS database with MYSQL engine.
+
+Parameters:
+  VpcId:
+    Type: String
+    Default: vpc-0172f9d7f8c178806
+
+  DBInstanceIdentifier:
+    Type: String
+    Default: mysqldb
+  Pass:
+    Type: String
+    Default: Password@32
+  DBName:
+    Type: String
+    Default: applicationdb
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+  DBInstanceClass:
+    Type: String
+    Default: db.t2.small
+  MultiAZ:
+    Type: String
+    Default: false
+  DBEngine:
+    Type: String
+    Default: MYSQL
+  DBEngineVersion:
+    Type: String
+    Default: 8.0.32
+  EnvironmentName:
+    Type: String
+    Default: dev
+
+  Application:
+    Type: String
+    Default: App
+    Description: Define the application name
+
+Resources:
+  DatabasesSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnet group for RDS database
+      SubnetIds:
+        - subnet-026a4de3b32ce30d4
+        - subnet-064d3272b4081aa26
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-DatabasesubnetGroup-${Application}"
+  
+  DatabaseParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: Custom RDS parameter group
+      Family: "mysql8.0"
+      Parameters:
+        max_connections: "1000"
+        max_prepared_stmt_count: "10000"
+        optimizer_switch: "use_index_extensions=off,derived_merge=off"
+
+  DatabaseInstance:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    Properties:
+      AllocatedStorage: !Ref DBAllocatedStorage
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+      DBInstanceClass: !Ref DBInstanceClass
+      DBInstanceIdentifier: !Ref DBInstanceIdentifier
+      DBName: !Ref DBName
+      MasterUserPassword: !Ref Pass
+      DBSubnetGroupName: !Ref DatabasesSubnetGroup
+      Engine: !Ref DBEngine
+      EngineVersion: !Ref DBEngineVersion
+      MasterUsername: admin
+      MultiAZ: !Ref MultiAZ
+      PubliclyAccessible: false
+      VPCSecurityGroups: 
+         - sg-02a405b8bb4fd7b4f
+      DBParameterGroupName: !Ref DatabaseParameterGroup
+      AutoMinorVersionUpgrade: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${EnvironmentName}-DatabaseInstance-${Application}"
